@@ -56,6 +56,9 @@ bool FFXFeatureDx12::EvaluateInternal(ID3D12GraphicsCommandList* InCommandList, 
 {
     LOG_FUNC();
 
+    // The previous frame's copies are done by now
+    _inputDump.Flush((uint32_t) FrameCount());
+
     auto& cfg = *Config::Instance();
 
     struct ffxDispatchDescUpscale params = { 0 };
@@ -496,6 +499,10 @@ bool FFXFeatureDx12::EvaluateInternal(ID3D12GraphicsCommandList* InCommandList, 
     }
 
     LOG_DEBUG("Dispatch!!");
+
+    // The inputs are final here, the upscaler gets the same resources
+    DumpInputs(InCommandList, params);
+
     auto result = FfxApiProxy::D3D12_Dispatch(&_context, &params.header);
 
     if (result != FFX_API_RETURN_OK)
@@ -514,6 +521,81 @@ bool FFXFeatureDx12::EvaluateInternal(ID3D12GraphicsCommandList* InCommandList, 
     _frameCount++;
 
     return true;
+}
+
+void FFXFeatureDx12::DumpInputs(ID3D12GraphicsCommandList* InCommandList, const ffxDispatchDescUpscale& InParams)
+{
+    auto& cfg = *Config::Instance();
+
+    if (!_inputDump.NeedsFrame())
+        return;
+
+    const auto version = Version();
+    const auto frameCount = (uint32_t) FrameCount();
+    const auto colorRect = GetSubrect(SubrectSlot::Color);
+    const auto depthRect = GetSubrect(SubrectSlot::Depth);
+    const auto mvRect = GetSubrect(SubrectSlot::MV);
+
+    auto folder = Util::DllPath().parent_path() / cfg.DumpPath.value_or_default() /
+                  std::format("{}_{}.{}.{}", ShortName(), version.major, version.minor, version.patch) /
+                  std::format("frame_{:04}", frameCount);
+
+    auto info = std::format("Upscaler: {} {}.{}.{}\n"
+                            "API: DX12\n"
+                            "Frame: {}\n"
+                            "Render: {}x{}, Target: {}x{}, Display: {}x{}\n"
+                            "Views: color {}x{} at {},{}; depth {}x{} at {},{}; mv {}x{} at {},{}\n"
+                            "Upscale size: {}x{}\n"
+                            "Jitter: {}, {}\n"
+                            "MV scale: {}, {}\n"
+                            "Reset: {}\n"
+                            "Pre exposure: {}\n"
+                            "Camera near/far/fov: {}, {}, {}\n"
+                            "Sharpness: {}, enabled: {}\n",
+                            ShortName(), version.major, version.minor, version.patch, frameCount, RenderWidth(),
+                            RenderHeight(), TargetWidth(), TargetHeight(), DisplayWidth(), DisplayHeight(),
+                            colorRect.Width, colorRect.Height, colorRect.X, colorRect.Y, depthRect.Width,
+                            depthRect.Height, depthRect.X, depthRect.Y, mvRect.Width, mvRect.Height, mvRect.X, mvRect.Y,
+                            InParams.upscaleSize.width, InParams.upscaleSize.height, InParams.jitterOffset.x,
+                            InParams.jitterOffset.y, InParams.motionVectorScale.x, InParams.motionVectorScale.y,
+                            InParams.reset, InParams.preExposure, InParams.cameraNear, InParams.cameraFar,
+                            InParams.cameraFovAngleVertical, InParams.sharpness, InParams.enableSharpening);
+
+    if (!_inputDump.BeginFrame(folder, info, frameCount))
+        return;
+
+    const auto subrect = [this](SubrectSlot InSlot, const FfxApiResource& InResource)
+    {
+        auto rect = GetSubrect(InSlot);
+
+        // A view that doesn't start at (0, 0) got copied for the backend, the copy starts at (0, 0)
+        if (InResource.resource != nullptr && _subrectCopied[(size_t) InSlot] == (ID3D12Resource*) InResource.resource)
+        {
+            rect.X = 0;
+            rect.Y = 0;
+        }
+
+        return rect;
+    };
+
+    const auto dump = [this, InCommandList](const char* InName, const FfxApiResource& InResource,
+                                            const Subrect& InRect, bool InDepth)
+    {
+        if (InResource.resource == nullptr)
+            return;
+
+        _inputDump.Capture(InCommandList, Device, InName, (ID3D12Resource*) InResource.resource,
+                           D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, InRect, InDepth);
+    };
+
+    dump("color", InParams.color, subrect(SubrectSlot::Color, InParams.color), false);
+    dump("depth", InParams.depth, subrect(SubrectSlot::Depth, InParams.depth), true);
+    dump("motion-vectors", InParams.motionVectors, subrect(SubrectSlot::MV, InParams.motionVectors), false);
+
+    // The masks and the exposure are sized by their own views, only the bias mask gets cropped for the backend
+    dump("reactive", InParams.reactive, {}, false);
+    dump("transparency", InParams.transparencyAndComposition, {}, false);
+    dump("exposure", InParams.exposure, {}, false);
 }
 
 bool FFXFeatureDx12::InitFFX(const NVSDK_NGX_Parameter* InParameters)

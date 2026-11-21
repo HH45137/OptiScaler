@@ -308,6 +308,9 @@ class State
     // or read its parameters
     bool rrRequested = false;
 
+    // Dump
+    uint32_t dumpRequest = 0;
+
     // XeSS debug stuff
     bool xessDebug = false;
     int xessDebugFrames = 5;

@@ -175,6 +175,40 @@ It can be changed from the in-game menu with real-time results.
 
 ![fsr](images/fsr.png)
 
+### FSR Input Dump
+FSR 3.1 and newer DX12 upscalers can dump their inputs as lossless DDS files. A dump starts when the option gets
+enabled, either from the `[Dump]` section or with the `Dump Inputs` checkbox in the FSR settings, and lasts the
+configured number of frames. The files are written a few frames later so the game doesn't wait for the GPU.
+
+```ini
+[Dump]
+; Dumps the upscaler inputs as lossless DDS files next to the log
+; true or false - Default (auto) is false
+Enabled=auto
+
+; Folder for the dumps, relative paths are from the game's folder
+; Default (auto) is OptiScalerDumps
+Path=auto
+
+; Number of frames dumped after the dump gets enabled
+; 1 - 100 - Default (auto) is 1
+Frames=auto
+
+; Shortcut key that dumps the next frames
+; Use virtual key codes, e.g. 0x79 for F10
+; -1 -> No shortcut key
+; Default (auto) is 0x79 (F10)
+ShortcutKey=auto
+```
+
+The shortcut is also listed under `Keybinds` in the menu, it can be rebound there. Pressing it starts a new dump without
+changing the ini, so a debug dump doesn't turn on for the next launch.
+
+Every dumped frame gets its own folder with the input textures (`color.dds`, `depth.dds`, `motion-vectors.dds`,
+`reactive.dds`, `transparency.dds` and `exposure.dds`) and a `frame.txt` with the upscaler parameters (jitter, motion
+vector scale, camera values and the dumped resources' formats). Depth textures are always written as `R32_FLOAT`
+(the depth plane only, 16/24-bit UNORM depth is scaled to 0..1) so every DDS tool can open them.
+
 ### Sharpness
 DLSS used to have a sharpening option, but later it was removed. So some games have sharpness slider and some do not. With this option you can disable or enable the sharpness of the final image. FSR has built in sharpness but for XeSS CAS option must be enabled.
 

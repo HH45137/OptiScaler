@@ -499,6 +499,19 @@ bool Config::Reload(std::filesystem::path iniPath)
             }
         }
 
+        // Dump
+        {
+            DumpEnabled.set_from_config(readBool("Dump", "Enabled"));
+
+            if (auto setting = readString("Dump", "Path", false); setting.has_value() && !setting.value().empty())
+                DumpPath.set_from_config(setting.value());
+
+            if (auto setting = readInt("Dump", "Frames"); setting.has_value())
+                DumpFrames.set_from_config(std::clamp(setting.value(), 1, 100));
+
+            DumpShortcutKey.set_from_config(readInt("Dump", "ShortcutKey"));
+        }
+
         // Sharpness
         {
             SharpnessShader.set_from_config(
@@ -1996,6 +2009,16 @@ bool Config::SaveIni()
         ini.SetValue("Log", "LogAsync", GetBoolValue(Instance()->LogAsync.value_for_config()).c_str());
         ini.SetValue("Log", "LogAsyncThreads", GetIntValue(Instance()->LogAsyncThreads.value_for_config()).c_str());
         ini.SetValue("Log", "CreateDumps", GetBoolValue(Instance()->CreateDumps.value_for_config()).c_str());
+    }
+
+    // Dump
+    {
+        ini.SetValue("Dump", "Enabled", GetBoolValue(Instance()->DumpEnabled.value_for_config()).c_str());
+        ini.SetValue("Dump", "Path", Instance()->DumpPath.value_for_config_or("auto").c_str());
+        ini.SetValue("Dump", "Frames", GetIntValue(Instance()->DumpFrames.value_for_config()).c_str());
+
+        auto dumpKey = Instance()->DumpShortcutKey.value_for_config();
+        ini.SetValue("Dump", "ShortcutKey", GetIntValue(dumpKey, dumpKey > 0).c_str());
     }
 
     // NvApi

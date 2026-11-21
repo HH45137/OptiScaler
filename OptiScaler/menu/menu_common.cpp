@@ -76,6 +76,7 @@ static bool fgHotkeyLeftDefault = false; // FG hotkey temporarily overrode Defau
 static int fgHotkeySavedOverride = -1;   // Override DLSSG Ratio with value before Off, -1 = Default
 static bool inputFps = false;
 static bool inputFpsCycle = false;
+static bool inputDump = false;
 static uint64_t lastInputTick = 0;
 constexpr uint64_t debounceThreshold = 1000;
 
@@ -794,6 +795,8 @@ void MenuCommon::UpdateManualInput(HWND targetHwnd)
         CheckShortcut(config->FGShortcutKey.value_or_default(), inputFG, "Menu key pressed, will be switching FG mode");
         CheckShortcut(config->FpsCycleShortcutKey.value_or_default(), inputFpsCycle,
                       "Menu key pressed, will be switching FPS mode");
+        CheckShortcut(config->DumpShortcutKey.value_or_default(), inputDump,
+                      "Dump key pressed, will be dumping the upscaler inputs");
     }
     else if (capturingKey)
     {
@@ -2474,6 +2477,17 @@ void MenuCommon::HandleMenuShortcuts(RenderMenuContext& ctx)
         {
             inputFps = false;
             config->ShowFps = !config->ShowFps.value_or_default();
+        }
+
+        if (inputDump)
+        {
+            inputDump = false;
+
+            // Volatile so a hotkey doesn't turn the dump on in the ini, the request restarts an enabled dump too
+            config->DumpEnabled.set_volatile_value(true);
+            state.dumpRequest++;
+
+            LOG_DEBUG("Dump key pressed, dumping the next {} frames", config->DumpFrames.value_or_default());
         }
 
         if (inputFpsCycle && config->ShowFps.value_or_default())
@@ -4320,6 +4334,33 @@ void MenuCommon::RenderActiveUpscalerSettings(RenderMenuContext& ctx)
                 ImGui::Spacing();
             }
         }
+        ImGui::Spacing();
+
+        if (bool dump = config->DumpEnabled.value_or_default(); ImGui::Checkbox("Dump Inputs", &dump))
+            config->DumpEnabled = dump;
+
+        const auto dumpTooltip = std::format(
+            "Dumps the upscaler inputs as lossless DDS files\nto the dump folder next to the log\nHotkey: {}",
+            Keybind::KeyNameFromVirtualKeyCode(config->DumpShortcutKey.value_or_default()));
+        ShowTooltip(dumpTooltip.c_str());
+
+        ImGui::SameLine(0.0f, 6.0f);
+        int dumpFrames = config->DumpFrames.value_or_default();
+
+        ImGui::PushItemWidth(95.0f * menuResScale);
+        if (ImGui::InputInt("frames", &dumpFrames))
+        {
+            if (dumpFrames < 1)
+                dumpFrames = 1;
+            else if (dumpFrames > 100)
+                dumpFrames = 100;
+
+            config->DumpFrames = dumpFrames;
+        }
+        ImGui::PopItemWidth();
+
+        ImGui::Spacing();
+        ImGui::Spacing();
     }
 
     // FSR 3.1 Dx11 -----------------
@@ -9563,11 +9604,13 @@ void MenuCommon::RenderKeybindSettings(RenderMenuContext& ctx)
         static auto fpsOverlay = Keybind("FPS Overlay", 11);
         static auto fpsOverlayCycle = Keybind("FPS Overlay Cycle", 12);
         static auto fgEnable = Keybind("Frame Generation", 13);
+        static auto dumpInputs = Keybind("Dump Inputs", 14);
 
         menu.Render(config->ShortcutKey);
         fpsOverlay.Render(config->FpsShortcutKey);
         fpsOverlayCycle.Render(config->FpsCycleShortcutKey);
         fgEnable.Render(config->FGShortcutKey);
+        dumpInputs.Render(config->DumpShortcutKey);
     }
 }
 
@@ -11082,6 +11125,7 @@ void KeyUp(UINT vKey)
     inputFps = vKey == Config::Instance()->FpsShortcutKey.value_or_default();
     inputFG = vKey == Config::Instance()->FGShortcutKey.value_or_default();
     inputFpsCycle = vKey == Config::Instance()->FpsCycleShortcutKey.value_or_default();
+    inputDump = vKey == Config::Instance()->DumpShortcutKey.value_or_default();
 }
 
 bool MenuCommon::RenderMenu()

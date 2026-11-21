@@ -41,6 +41,9 @@
     <ClInclude Include="pch.h">
       <Filter>Other</Filter>
     </ClInclude>
+    <ClInclude Include="dump\InputDump_Dx12.h">
+      <Filter>Other</Filter>
+    </ClInclude>
     <ClInclude Include="upscalers\fsr2\FSR2Feature.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1238,6 +1241,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="dump\InputDump_Dx12.cpp">
+      <Filter>Other</Filter>
+    </ClCompile>
     <ClCompile Include="Util.cpp">
       <Filter>Util</Filter>
     </ClCompile>

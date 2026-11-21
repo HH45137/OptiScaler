@@ -4,6 +4,7 @@
 
 #include "dx12/ffx_api_dx12.h"
 #include "proxies/FfxApi_Proxy.h"
+#include <dump/InputDump_Dx12.h>
 #include <shaders/auto_exposure/AE_Dx12.h>
 
 class FFXFeatureDx12 : public FFXFeature, public IFeature_Dx12
@@ -15,7 +16,12 @@ class FFXFeatureDx12 : public FFXFeature, public IFeature_Dx12
     // Custom upscaler dll, nullptr for the regular FFX ones
     CustomFfxModule* _customUpscaler = nullptr;
 
+    InputDump_Dx12 _inputDump;
+
     NVSDK_NGX_Parameter* SetParameters(NVSDK_NGX_Parameter* InParameters);
+
+    // Records the inputs the upscaler reads, the files are written on a later frame
+    void DumpInputs(ID3D12GraphicsCommandList* InCommandList, const ffxDispatchDescUpscale& InParams);
 
   protected:
     bool InitFFX(const NVSDK_NGX_Parameter* InParameters);

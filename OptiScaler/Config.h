@@ -310,6 +310,12 @@ class Config
     CustomOptional<int> LogAsyncThreads { 4 };
     CustomOptional<bool> CreateDumps { false };
 
+    // Dump
+    CustomOptional<bool> DumpEnabled { false };
+    CustomOptional<std::string> DumpPath { "OptiScalerDumps" };
+    CustomOptional<int> DumpFrames { 1 };
+    CustomOptional<int> DumpShortcutKey { VK_F10 };
+
     // XeSS
     CustomOptional<bool> BuildPipelines { true };
     CustomOptional<int32_t> NetworkModel { 0 };
